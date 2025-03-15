@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1 class="text-center mb-4">Company Location Finder</h1>
+    
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <form id="analyzeForm" class="mb-4">
+                <div class="input-group">
+                    <input type="text" class="form-control" id="domain" 
+                           placeholder="Enter company domain (e.g., jpmorgan.com)" required>
+                    <button class="btn btn-primary" type="submit">Analyze</button>
+                </div>
+            </form>
+
+            <div id="loading" class="text-center d-none">
+                <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2">Analyzing website... This may take a few minutes.</p>
+            </div>
+
+            <div id="results" class="d-none">
+                <h3>Results for <span id="domainName"></span></h3>
+                
+                <div class="card mb-3">
+                    <div class="card-header">Countries</div>
+                    <div class="card-body">
+                        <div id="countriesTable"></div>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-header">Cities & Regions</div>
+                    <div class="card-body">
+                        <div id="citiesTable"></div>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-header">Other Locations</div>
+                    <div class="card-body">
+                        <div id="othersTable"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="error" class="alert alert-danger d-none"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('analyzeForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const domain = document.getElementById('domain').value;
+    const loading = document.getElementById('loading');
+    const results = document.getElementById('results');
+    const error = document.getElementById('error');
+    
+    // Reset UI
+    loading.classList.remove('d-none');
+    results.classList.add('d-none');
+    error.classList.add('d-none');
+    
+    try {
+        const response = await fetch('/analyze', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `domain=${encodeURIComponent(domain)}`
+        });
+        
+        const data = await response.json();
+        
+        // Check if response is valid
+        if (!data) {
+            throw new Error('Invalid response from server');
+        }
+
+        // Check for error in response
+        if (data.error) {
+            throw new Error(data.error);
+        }
+
+        // Check if required data exists
+        if (!data.countries || !data.cities || !data.others) {
+            throw new Error('Invalid data format received from server');
+        }
+        
+        document.getElementById('domainName').textContent = data.domain || domain;
+        
+        // Update tables with error handling
+        document.getElementById('countriesTable').innerHTML = createTable(data.countries, 
+            ['Country', 'Mentions', 'Confidence']);
+        document.getElementById('citiesTable').innerHTML = createTable(data.cities, 
+            ['City/Region', 'Mentions', 'Confidence', 'Country']);
+        document.getElementById('othersTable').innerHTML = createTable(data.others, 
+            ['Location', 'Mentions', 'Confidence']);
+        
+        results.classList.remove('d-none');
+    } catch (err) {
+        console.error('Error:', err);
+        error.textContent = err.message || 'An error occurred while analyzing the domain';
+        error.classList.remove('d-none');
+    } finally {
+        loading.classList.add('d-none');
+    }
+});
+
+function createTable(data, headers) {
+    if (!Array.isArray(data) || data.length === 0) {
+        return '<p>No data available</p>';
+    }
+    
+    try {
+        return `
+            <table class="table">
+                <thead>
+                    <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
+                </thead>
+                <tbody>
+                    ${data.map(row => `
+                        <tr>${Array.isArray(row) ? row.map(cell => `<td>${cell || ''}</td>`).join('') : ''}</tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    } catch (err) {
+        console.error('Error creating table:', err);
+        return '<p>Error displaying data</p>';
+    }
+}
+</script>
+{% endblock %}
