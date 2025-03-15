@@ -3,6 +3,7 @@ import re
 import spacy
 import time
 import os
+import gc
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse
 from collections import Counter
@@ -106,17 +107,31 @@ def scrape_locations(url):
         response = requests.get(url, headers=headers, timeout=10)
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # Extract text from relevant sections
-        text = ' '.join(p.get_text() for p in soup.find_all(['p', 'div', 'span']))
+        # Extract only relevant text to reduce memory
+        relevant_tags = soup.find_all(['p', 'div', 'span'], limit=200)  # Limit number of elements
+        text = ' '.join(p.get_text() for p in relevant_tags)
         
-        # Process with spaCy
-        doc = nlp(text)
+        # Clean up memory
+        del soup
+        del response
+        gc.collect()
+        
+        # Process with spaCy in chunks if text is large
         locations = set()
+        chunk_size = 10000  # Process text in chunks
         
-        # Extract locations from named entities
-        for ent in doc.ents:
-            if ent.label_ in ["GPE", "LOC"]:
-                locations.add(ent.text)
+        for i in range(0, len(text), chunk_size):
+            chunk = text[i:i+chunk_size]
+            doc = nlp(chunk)
+            
+            # Extract locations from named entities
+            for ent in doc.ents:
+                if ent.label_ in ["GPE", "LOC"]:
+                    locations.add(ent.text)
+            
+            # Release memory
+            del doc
+            gc.collect()
         
         return list(locations)
     except Exception as e:
@@ -142,12 +157,14 @@ def process_company_domain(domain):
         location_counter = Counter()
         
         # Analyze pages
-        for url in search_results[:3]:
+        for url in search_results[:2]:
             locations = scrape_locations(url)
             for loc in locations:
                 # Normalize country names using mapping
                 normalized_loc = COUNTRY_MAPPING.get(loc, loc)
                 location_counter[normalized_loc] += 1
+
+        gc.collect()
         
         # Separate countries and cities
         countries = []
