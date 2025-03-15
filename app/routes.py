@@ -1,3 +1,4 @@
+import time
 from flask import render_template, request, jsonify
 from app import app
 from app.location_finder import process_company_domain
@@ -10,16 +11,24 @@ def index():
 def analyze():
     domain = request.form.get('domain')
 
-    if not domain:  # Handle missing domain input
+    if not domain:
         return jsonify({"error": "Domain is required"}), 400  
 
     try:
+        print(f"Processing domain: {domain}...")  
+        start_time = time.time()
+
+        # Call your function
         result = process_company_domain(domain)
-        
-        if not result:  # Handle case where function returns None or empty
+
+        execution_time = time.time() - start_time
+        print(f"Processing took {execution_time:.2f} seconds")
+
+        if not result:
             return jsonify({"error": "No data found for the domain"}), 404  
 
-        return jsonify(result)  # Always return valid JSON
-    
+        return jsonify(result)
+
     except Exception as e:
-        return jsonify({"error": str(e)}), 500  # Handle unexpected errors
+        print(f"Error: {str(e)}")  
+        return jsonify({"error": str(e)}), 500  
