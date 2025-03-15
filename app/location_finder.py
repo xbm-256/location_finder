@@ -12,12 +12,12 @@ load_dotenv()
 
 # Initialize spaCy
 try:
-    nlp = spacy.load("en_core_web_md")
+    nlp = spacy.load("en_core_web_sm")
 except OSError:
     print("Downloading required language model...")
     import spacy.cli
-    spacy.cli.download("en_core_web_md")
-    nlp = spacy.load("en_core_web_md")
+    spacy.cli.download("en_core_web_sm")
+    nlp = spacy.load("en_core_web_sm")
 
 # Google API credentials
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
